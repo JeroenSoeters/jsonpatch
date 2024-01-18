@@ -1,8 +1,9 @@
 package jsonpatch
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var superComplexBase = `
@@ -490,13 +491,13 @@ var superComplexA = `
 }`
 
 func TestSuperComplexSame(t *testing.T) {
-	patch, e := CreatePatch([]byte(superComplexBase), []byte(superComplexBase))
+	patch, e := CreatePatch([]byte(superComplexBase), []byte(superComplexBase), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 0, len(patch), "they should be equal")
 }
 
 func TestSuperComplexBoolReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(superComplexBase), []byte(superComplexA))
+	patch, e := CreatePatch([]byte(superComplexBase), []byte(superComplexA), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]

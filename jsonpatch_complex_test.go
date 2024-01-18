@@ -1,9 +1,10 @@
 package jsonpatch
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var complexBase = `{"a":100, "b":[{"c1":"hello", "d1":"foo"},{"c2":"hello2", "d2":"foo2"} ], "e":{"f":200, "g":"h", "i":"j"}}`
@@ -14,12 +15,12 @@ var complexD = `{"a":100, "b":[{"c1":"hello", "d1":"foo"},{"c2":"hello2", "d2":"
 var complexE = `{"a":100, "b":[{"c1":"hello", "d1":"foo"},{"c2":"hello2", "d2":"foo2"} ], "e":{"f":200, "g":"h", "i":"j"}}`
 
 func TestComplexSame(t *testing.T) {
-	patch, e := CreatePatch([]byte(complexBase), []byte(complexBase))
+	patch, e := CreatePatch([]byte(complexBase), []byte(complexBase), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 0, len(patch), "they should be equal")
 }
 func TestComplexOneStringReplaceInArray(t *testing.T) {
-	patch, e := CreatePatch([]byte(complexBase), []byte(complexA))
+	patch, e := CreatePatch([]byte(complexBase), []byte(complexA), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -29,7 +30,7 @@ func TestComplexOneStringReplaceInArray(t *testing.T) {
 }
 
 func TestComplexOneIntReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(complexBase), []byte(complexB))
+	patch, e := CreatePatch([]byte(complexBase), []byte(complexB), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -40,7 +41,7 @@ func TestComplexOneIntReplace(t *testing.T) {
 }
 
 func TestComplexOneAdd(t *testing.T) {
-	patch, e := CreatePatch([]byte(complexBase), []byte(complexC))
+	patch, e := CreatePatch([]byte(complexBase), []byte(complexC), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -55,7 +56,7 @@ func TestComplexOneAdd(t *testing.T) {
 }
 
 func TestComplexOneAddToArray(t *testing.T) {
-	patch, e := CreatePatch([]byte(complexBase), []byte(complexC))
+	patch, e := CreatePatch([]byte(complexBase), []byte(complexC), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -70,7 +71,7 @@ func TestComplexOneAddToArray(t *testing.T) {
 }
 
 func TestComplexVsEmpty(t *testing.T) {
-	patch, e := CreatePatch([]byte(complexBase), []byte(empty))
+	patch, e := CreatePatch([]byte(complexBase), []byte(empty), false)
 	assert.NoError(t, e)
 	assert.Equal(t, 3, len(patch), "they should be equal")
 	sort.Sort(ByPath(patch))
