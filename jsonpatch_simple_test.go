@@ -17,7 +17,7 @@ var simpleG = `{"a":100, "b":null, "d":"foo"}`
 var empty = `{}`
 
 func TestOneNullReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(simplef), []byte(simpleG))
+	patch, e := CreatePatch([]byte(simplef), []byte(simpleG), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 1, "they should be equal")
 	change := patch[0]
@@ -27,13 +27,13 @@ func TestOneNullReplace(t *testing.T) {
 }
 
 func TestSame(t *testing.T) {
-	patch, e := CreatePatch([]byte(simpleA), []byte(simpleA))
+	patch, e := CreatePatch([]byte(simpleA), []byte(simpleA), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 0, "they should be equal")
 }
 
 func TestOneStringReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(simpleA), []byte(simpleB))
+	patch, e := CreatePatch([]byte(simpleA), []byte(simpleB), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 1, "they should be equal")
 	change := patch[0]
@@ -43,7 +43,7 @@ func TestOneStringReplace(t *testing.T) {
 }
 
 func TestOneIntReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(simpleA), []byte(simpleC))
+	patch, e := CreatePatch([]byte(simpleA), []byte(simpleC), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 1, "they should be equal")
 	change := patch[0]
@@ -54,7 +54,7 @@ func TestOneIntReplace(t *testing.T) {
 }
 
 func TestOneAdd(t *testing.T) {
-	patch, e := CreatePatch([]byte(simpleA), []byte(simpleD))
+	patch, e := CreatePatch([]byte(simpleA), []byte(simpleD), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 1, "they should be equal")
 	change := patch[0]
@@ -64,7 +64,7 @@ func TestOneAdd(t *testing.T) {
 }
 
 func TestOneRemove(t *testing.T) {
-	patch, e := CreatePatch([]byte(simpleA), []byte(simpleE))
+	patch, e := CreatePatch([]byte(simpleA), []byte(simpleE), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 1, "they should be equal")
 	change := patch[0]
@@ -74,7 +74,7 @@ func TestOneRemove(t *testing.T) {
 }
 
 func TestVsEmpty(t *testing.T) {
-	patch, e := CreatePatch([]byte(simpleA), []byte(empty))
+	patch, e := CreatePatch([]byte(simpleA), []byte(empty), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 3, "they should be equal")
 	sort.Sort(ByPath(patch))
@@ -101,7 +101,7 @@ func BenchmarkBigArrays(b *testing.B) {
 		a2[i+1] = i
 	}
 	for i := 0; i < b.N; i++ {
-		compareArray(a1, a2, "/")
+		compareArray(a1, a2, "/", false)
 	}
 }
 
@@ -115,6 +115,6 @@ func BenchmarkBigArrays2(b *testing.B) {
 		a2[i] = i
 	}
 	for i := 0; i < b.N; i++ {
-		compareArray(a1, a2, "/")
+		compareArray(a1, a2, "/", false)
 	}
 }

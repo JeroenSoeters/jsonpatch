@@ -1,16 +1,17 @@
 package jsonpatch
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var point = `{"type":"Point", "coordinates":[0.0, 1.0]}`
 var lineString = `{"type":"LineString", "coordinates":[[0.0, 1.0], [2.0, 3.0]]}`
 
 func TestPointLineStringReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(point), []byte(lineString))
+	patch, e := CreatePatch([]byte(point), []byte(lineString), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 3, "they should be equal")
 	sort.Sort(ByPath(patch))
@@ -29,7 +30,7 @@ func TestPointLineStringReplace(t *testing.T) {
 }
 
 func TestLineStringPointReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(lineString), []byte(point))
+	patch, e := CreatePatch([]byte(lineString), []byte(point), false)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 3, "they should be equal")
 	sort.Sort(ByPath(patch))
