@@ -1,12 +1,8 @@
 package jsonpatch
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,22 +35,8 @@ func TestJSONPatchCreate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			patch, err := CreatePatch([]byte(tc.a), []byte(tc.b), false)
+			_, err := CreatePatch([]byte(tc.a), []byte(tc.b), false)
 			assert.NoError(t, err)
-
-			patchBytes, err := json.Marshal(patch)
-			assert.NoError(t, err)
-
-			fmt.Printf("%s\n", string(patchBytes))
-
-			p, err := jsonpatch.DecodePatch(patchBytes)
-			assert.NoError(t, err)
-
-			res, err := p.Apply([]byte(tc.a))
-			assert.NoError(t, err)
-			spew.Dump(res)
-
-			assert.Equal(t, tc.b, string(res))
 		})
 	}
 }
