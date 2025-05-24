@@ -101,7 +101,7 @@ func BenchmarkBigArrays(b *testing.B) {
 		a2[i+1] = i
 	}
 	for i := 0; i < b.N; i++ {
-		compareArray(a1, a2, "/", false)
+		compareArray(a1, a2, "/", NewExactMatchStrategy(false))
 	}
 }
 
@@ -115,6 +115,6 @@ func BenchmarkBigArrays2(b *testing.B) {
 		a2[i] = i
 	}
 	for i := 0; i < b.N; i++ {
-		compareArray(a1, a2, "/", false)
+		compareArray(a1, a2, "/", NewExactMatchStrategy(false))
 	}
 }
