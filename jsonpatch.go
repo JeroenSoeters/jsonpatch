@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -24,18 +25,60 @@ func NewExactMatchStrategy(ignoreArrayOrder bool) ExactMatchStrategy {
 	return ExactMatchStrategy{ignoreArrayOrder: ignoreArrayOrder}
 }
 
-type IdentitySet struct {
-	path string
-	key  string
+type Path string
+type Key string
+type SetIdentities map[Path]Key
+
+func (s SetIdentities) Add(path Path, key Key) {
+	if s == nil {
+		s = make(SetIdentities)
+	}
+	s[path] = key
+}
+
+func (s SetIdentities) Get(path Path) (Key, bool) {
+	if s == nil {
+		return "", false
+	}
+	key, ok := s[path]
+	return key, ok
+}
+
+func toJsonPath(path string) string {
+	if path == "" || path == "/" {
+		return "$"
+	}
+
+	parts := strings.Split(path, "/")
+	var jsonPathParts []string
+
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+
+		_, err := strconv.Atoi(part)
+		if err == nil {
+			jsonPathParts = append(jsonPathParts, "[*]")
+		} else {
+			jsonPathParts = append(jsonPathParts, "."+part)
+		}
+	}
+
+	return "$" + strings.Join(jsonPathParts, "")
 }
 
 type EnsureExistsStrategy struct {
-	identitySets []IdentitySet
+	setKeys SetIdentities
 }
 
 func (EnsureExistsStrategy) isStrategy() {}
 
 type EnsureAbsentStrategy struct{}
+
+func NewEnsureExistsStrategy(setKeys SetIdentities) EnsureExistsStrategy {
+	return EnsureExistsStrategy{setKeys: setKeys}
+}
 
 func (EnsureAbsentStrategy) isStrategy() {}
 
@@ -113,8 +156,12 @@ func CreatePatch_StrategyEnsureExists(a, b []byte) ([]JsonPatchOperation, error)
 	if err != nil {
 		return nil, errBadJSONDoc
 	}
+	sets := SetIdentities{
+		Path("$.t"):    Key("k"),
+		Path("$.t[*]"): Key("nk"),
+	}
 
-	return handleValues(aI, bI, "", []JsonPatchOperation{}, EnsureExistsStrategy{})
+	return handleValues(aI, bI, "", []JsonPatchOperation{}, NewEnsureExistsStrategy(sets))
 }
 
 // Returns true if the values matches (must be json types)
@@ -372,7 +419,7 @@ func compareArray(av, bv []any, p string, strategy Strategy) []JsonPatchOperatio
 			return retval
 		}
 		// Find elements that need to be removed
-		processArray(av, bv, func(i int, value any) {
+		processArray(av, bv, p, func(i int, value any) {
 			retval = append(retval, NewPatch("remove", makePath(p, i), nil))
 		}, strategy)
 
@@ -384,13 +431,21 @@ func compareArray(av, bv []any, p string, strategy Strategy) []JsonPatchOperatio
 
 		// Find elements that need to be added.
 		// NOTE we pass in `bv` then `av` so that processArray can find the missing elements.
-		processArray(bv, av, func(i int, value any) {
+		processArray(bv, av, p, func(i int, value any) {
 			retval = append(retval, NewPatch("add", makePath(p, i), value))
 		}, strategy)
 	case EnsureExistsStrategy:
-		processArray(bv, av, func(i int, value any) {
-			retval = append(retval, NewPatch("add", makePath(p, i), value))
-		}, strategy)
+		if _, ok := s.setKeys.Get(Path(toJsonPath(p))); ok {
+			processIdentitySet(bv, av, p, func(i int, value any) {
+				retval = append(retval, NewPatch("add", makePath(p, i), value))
+			}, func(ops []JsonPatchOperation) {
+				retval = append(retval, ops...)
+			}, strategy)
+		} else {
+			processArray(bv, av, p, func(i int, value any) {
+				retval = append(retval, NewPatch("add", makePath(p, i), value))
+			}, strategy)
+		}
 	case EnsureAbsentStrategy:
 		return nil
 	}
@@ -398,9 +453,59 @@ func compareArray(av, bv []any, p string, strategy Strategy) []JsonPatchOperatio
 	return retval
 }
 
+func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy Strategy) {
+	foundIndexes := make(map[int]struct{}, len(av))
+	bvCounts := make(map[string]int)
+	bvSeen := make(map[string]int) // Track how many we've seen during processing
+	offset := len(bv)
+
+	for _, v := range bv {
+		jsonBytes, err := json.Marshal(v)
+		if key, ok := strategy.(EnsureExistsStrategy).setKeys.Get(Path(toJsonPath(path))); ok {
+			jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
+		}
+		if err != nil {
+			continue // Skip if we can't marshal
+		}
+		jsonStr := string(jsonBytes)
+		bvCounts[jsonStr]++
+	}
+
+	// Check each element in av
+	for i, v := range av {
+		jsonBytes, err := json.Marshal(v)
+		if key, ok := strategy.(EnsureExistsStrategy).setKeys.Get(Path(toJsonPath(path))); ok {
+			jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
+		}
+		if err != nil {
+			applyOp(i+offset, v) // If we can't marshal, treat it as not found
+			continue
+		}
+
+		jsonStr := string(jsonBytes)
+		// If element exists in bv and we haven't seen all of them yet
+		if bvCounts[jsonStr] > bvSeen[jsonStr] {
+			foundIndexes[i] = struct{}{}
+			bvSeen[jsonStr]++
+			updateOps, err := handleValues(bv[bvSeen[jsonStr]], v, fmt.Sprintf("%s/%d", path, bvSeen[jsonStr]), []JsonPatchOperation{}, strategy)
+			if err != nil {
+				return
+			}
+			replaceOps(updateOps)
+		}
+	}
+
+	// Apply op for all elements in av that weren't found
+	for i, v := range av {
+		if _, ok := foundIndexes[i]; !ok {
+			applyOp(i+offset, v)
+		}
+	}
+}
+
 // processArray processes `av` and `bv` calling `applyOp` whenever a value is absent.
 // It keeps track of which indexes have already had `applyOp` called for and automatically skips them so you can process duplicate objects correctly.
-func processArray(av, bv []any, applyOp func(i int, value any), strategy Strategy) {
+func processArray(av, bv []any, path string, applyOp func(i int, value any), strategy Strategy) {
 	foundIndexes := make(map[int]struct{}, len(av))
 	reverseFoundIndexes := make(map[int]struct{}, len(av))
 
@@ -470,6 +575,9 @@ func processArray(av, bv []any, applyOp func(i int, value any), strategy Strateg
 
 		for _, v := range bv {
 			jsonBytes, err := json.Marshal(v)
+			if key, ok := s.setKeys.Get(Path(toJsonPath(path))); ok {
+				jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
+			}
 			if err != nil {
 				continue // Skip if we can't marshal
 			}
@@ -480,6 +588,9 @@ func processArray(av, bv []any, applyOp func(i int, value any), strategy Strateg
 		// Check each element in av
 		for i, v := range av {
 			jsonBytes, err := json.Marshal(v)
+			if key, ok := s.setKeys.Get(Path(toJsonPath(path))); ok {
+				jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
+			}
 			if err != nil {
 				applyOp(i+offset, v) // If we can't marshal, treat it as not found
 				continue

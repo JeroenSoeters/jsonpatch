@@ -16,9 +16,10 @@ var simpleObjAddPrimitiveArrayItem = `{"b":[3]}`
 var simpleObjAddDuplicateArrayItem = `{"b":[2]}`
 var simpleObjSingletonObjectArray = `{"a":100, "b":[{"c":1}]}`
 var simpleObjAddObjectArrayItem = `{"b":[{"c":2}]}`
-var simpleObjKeyValueArray = `{"a":100, "b":[{"c":1},{"d":2}]}`
-var simpleObjAddKeyValueArrayItem = `{"b":[{"e":3}]}`
-var simpleObjModifyKeyValueArrayItem = `{"b":[{"d":3}]}`
+var simpleObjAddDuplicateObjectArrayItem = `{"b":[{"c":1}]}`
+var simpleObjKeyValueArray = `{"a":100, "t":[{"k":1, "v":1},{"k":2, "v":2}]}`
+var simpleObjAddKeyValueArrayItem = `{"t":[{"k":3, "v":3}]}`
+var simpleObjModifyKeyValueArrayItem = `{"t":[{"k":2, "v":3}]}`
 
 var nestedObj = `{"a":100, "b":{"c":200}}`
 var nestedObjModifyProp = `{"b":{"c":250}}`
@@ -135,7 +136,24 @@ func TestCreatePatch_KeyValueArray_AddItem_GeneratesAddOperation(t *testing.T) {
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
 	assert.Equal(t, "add", change.Operation, "they should be equal")
-	assert.Equal(t, "/b/2", change.Path, "they should be equal")
-	var expected = map[string]any{"e": float64(3)}
+	assert.Equal(t, "/t/2", change.Path, "they should be equal")
+	var expected = map[string]any{"k": float64(3), "v": float64(3)}
+	assert.Equal(t, expected, change.Value, "they should be equal")
+}
+
+func TestCreatePatch_SingletonObjectArray_AddDuplicateItem_GeneratesNoOperations(t *testing.T) {
+	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjSingletonObjectArray), []byte(simpleObjAddDuplicateObjectArrayItem))
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(patch), "they should be equal")
+}
+
+func TestCreatePatch_KeyValueArray_ModifyItem_GeneratesReplaceOperation(t *testing.T) {
+	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjKeyValueArray), []byte(simpleObjModifyKeyValueArrayItem))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(patch), "they should be equal")
+	change := patch[0]
+	assert.Equal(t, "replace", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v", change.Path, "they should be equal")
+	var expected float64 = 3
 	assert.Equal(t, expected, change.Value, "they should be equal")
 }
