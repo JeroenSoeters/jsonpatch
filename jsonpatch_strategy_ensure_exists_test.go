@@ -20,6 +20,30 @@ var simpleObjAddDuplicateObjectArrayItem = `{"b":[{"c":1}]}`
 var simpleObjKeyValueArray = `{"a":100, "t":[{"k":1, "v":1},{"k":2, "v":2}]}`
 var simpleObjAddKeyValueArrayItem = `{"t":[{"k":3, "v":3}]}`
 var simpleObjModifyKeyValueArrayItem = `{"t":[{"k":2, "v":3}]}`
+var simpleObjAddDuplicateKeyValueArrayItem = `{"t":[{"k":2, "v":2}]}`
+var complexNextedKeyValueArray = `{
+    "a":100, 
+    "t":[
+        {"k":1, 
+         "v":[
+            {"nk":11, "c":"x", "d":[1,2]},
+            {"nk":22, "c":"y", "d":[3,4]}
+         ]
+        },
+        {"k":2,
+         "v":[
+            {"nk":33, "c":"z", "d":[5,6]}
+            ]
+        }
+    ]}`
+var complexNextedKeyValueArrayModifyItem = `{
+    "t":[
+        {"k":2, 
+        "v":[
+            {"nk":33, "c":"zz", "d":[7,8]}
+        ]
+        }
+    ]}`
 
 var nestedObj = `{"a":100, "b":{"c":200}}`
 var nestedObjModifyProp = `{"b":{"c":250}}`
@@ -156,4 +180,29 @@ func TestCreatePatch_KeyValueArray_ModifyItem_GeneratesReplaceOperation(t *testi
 	assert.Equal(t, "/t/1/v", change.Path, "they should be equal")
 	var expected float64 = 3
 	assert.Equal(t, expected, change.Value, "they should be equal")
+}
+
+func TestCreatePatch_KeyValueArray_AddDuplicateItem_GeneratesNoOperations(t *testing.T) {
+	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjKeyValueArray), []byte(simpleObjAddDuplicateKeyValueArrayItem))
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(patch), "they should be equal")
+}
+
+func TestCreatePatch_ComplexNestedKeyValueArray_ModifyItem_GeneratesReplaceOperation(t *testing.T) {
+	patch, err := CreatePatch_StrategyEnsureExists([]byte(complexNextedKeyValueArray), []byte(complexNextedKeyValueArrayModifyItem))
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(patch), "they should be equal")
+	change := patch[0]
+	assert.Equal(t, "replace", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/c", change.Path, "they should be equal")
+	assert.Equal(t, "zz", change.Value, "they should be equal")
+	change = patch[1]
+	assert.Equal(t, "add", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/d/2", change.Path, "they should be equal")
+	assert.Equal(t, float64(7), change.Value, "they should be equal")
+	change = patch[2]
+	assert.Equal(t, "add", change.Operation, "they should be equal")
+	assert.Equal(t, "add", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/d/3", change.Path, "they should be equal")
+	assert.Equal(t, float64(8), change.Value, "they should be equal")
 }

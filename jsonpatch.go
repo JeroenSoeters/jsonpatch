@@ -29,6 +29,30 @@ type Path string
 type Key string
 type SetIdentities map[Path]Key
 
+// TODO: write test for this
+func NewPath(path string) Path {
+	if path == "" || path == "/" {
+		return Path("$")
+	}
+
+	parts := strings.Split(path, "/")
+	var jsonPathParts []string
+
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+
+		_, err := strconv.Atoi(part)
+		if err == nil {
+			jsonPathParts = append(jsonPathParts, "[*]")
+		} else {
+			jsonPathParts = append(jsonPathParts, "."+part)
+		}
+	}
+	return Path("$" + strings.Join(jsonPathParts, ""))
+}
+
 func (s SetIdentities) Add(path Path, key Key) {
 	if s == nil {
 		s = make(SetIdentities)
@@ -127,7 +151,7 @@ func NewPatch(operation, path string, value any) JsonPatchOperation {
 // The function will return an array of JsonPatchOperations
 // If ignoreArrayOrder is true, arrays with the same elements but in different order will be considered equal
 //
-// An error will be returned if any of the two documents are invalid.
+// An e rror will be returned if any of the two documents are invalid.
 func CreatePatch(a, b []byte, ignoreArrayOrder bool) ([]JsonPatchOperation, error) {
 	var aI any
 	var bI any
@@ -157,8 +181,8 @@ func CreatePatch_StrategyEnsureExists(a, b []byte) ([]JsonPatchOperation, error)
 		return nil, errBadJSONDoc
 	}
 	sets := SetIdentities{
-		Path("$.t"):    Key("k"),
-		Path("$.t[*]"): Key("nk"),
+		Path("$.t"):      Key("k"),
+		Path("$.t[*].v"): Key("nk"),
 	}
 
 	return handleValues(aI, bI, "", []JsonPatchOperation{}, NewEnsureExistsStrategy(sets))
@@ -456,10 +480,11 @@ func compareArray(av, bv []any, p string, strategy Strategy) []JsonPatchOperatio
 func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy Strategy) {
 	foundIndexes := make(map[int]struct{}, len(av))
 	bvCounts := make(map[string]int)
+	lookup := make(map[string]int)
 	bvSeen := make(map[string]int) // Track how many we've seen during processing
 	offset := len(bv)
 
-	for _, v := range bv {
+	for i, v := range bv {
 		jsonBytes, err := json.Marshal(v)
 		if key, ok := strategy.(EnsureExistsStrategy).setKeys.Get(Path(toJsonPath(path))); ok {
 			jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
@@ -468,6 +493,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 			continue // Skip if we can't marshal
 		}
 		jsonStr := string(jsonBytes)
+		lookup[jsonStr] = i
 		bvCounts[jsonStr]++
 	}
 
@@ -484,10 +510,10 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 
 		jsonStr := string(jsonBytes)
 		// If element exists in bv and we haven't seen all of them yet
-		if bvCounts[jsonStr] > bvSeen[jsonStr] {
+		if index, ok := lookup[jsonStr]; ok {
 			foundIndexes[i] = struct{}{}
 			bvSeen[jsonStr]++
-			updateOps, err := handleValues(bv[bvSeen[jsonStr]], v, fmt.Sprintf("%s/%d", path, bvSeen[jsonStr]), []JsonPatchOperation{}, strategy)
+			updateOps, err := handleValues(bv[index], v, fmt.Sprintf("%s/%d", path, lookup[jsonStr]), []JsonPatchOperation{}, strategy)
 			if err != nil {
 				return
 			}
@@ -575,9 +601,6 @@ func processArray(av, bv []any, path string, applyOp func(i int, value any), str
 
 		for _, v := range bv {
 			jsonBytes, err := json.Marshal(v)
-			if key, ok := s.setKeys.Get(Path(toJsonPath(path))); ok {
-				jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
-			}
 			if err != nil {
 				continue // Skip if we can't marshal
 			}
@@ -588,9 +611,6 @@ func processArray(av, bv []any, path string, applyOp func(i int, value any), str
 		// Check each element in av
 		for i, v := range av {
 			jsonBytes, err := json.Marshal(v)
-			if key, ok := s.setKeys.Get(Path(toJsonPath(path))); ok {
-				jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
-			}
 			if err != nil {
 				applyOp(i+offset, v) // If we can't marshal, treat it as not found
 				continue
