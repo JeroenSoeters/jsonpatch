@@ -22,27 +22,27 @@ var simpleObjAddKeyValueArrayItem = `{"t":[{"k":3, "v":3}]}`
 var simpleObjModifyKeyValueArrayItem = `{"t":[{"k":2, "v":3}]}`
 var simpleObjAddDuplicateKeyValueArrayItem = `{"t":[{"k":2, "v":2}]}`
 var complexNextedKeyValueArray = `{
-    "a":100, 
+    "a":100,
     "t":[
-        {"k":1, 
-         "v":[
-            {"nk":11, "c":"x", "d":[1,2]},
-            {"nk":22, "c":"y", "d":[3,4]}
-         ]
-        },
-        {"k":2,
-         "v":[
-            {"nk":33, "c":"z", "d":[5,6]}
-            ]
-        }
+    {"k":1,
+    "v":[
+    {"nk":11, "c":"x", "d":[1,2]},
+    {"nk":22, "c":"y", "d":[3,4]}
+    ]
+    },
+    {"k":2,
+    "v":[
+    {"nk":33, "c":"z", "d":[5,6]}
+    ]
+    }
     ]}`
 var complexNextedKeyValueArrayModifyItem = `{
     "t":[
-        {"k":2, 
-        "v":[
-            {"nk":33, "c":"zz", "d":[7,8]}
-        ]
-        }
+    {"k":2,
+    "v":[
+    {"nk":33, "c":"zz", "d":[7,8]}
+    ]
+    }
     ]}`
 
 var nestedObj = `{"a":100, "b":{"c":200}}`
@@ -51,8 +51,16 @@ var nestedObjAddProp = `{"b":{"d":"hello"}}`
 var nestedObjPrimitiveArray = `{"a":100, "b":{"c":[200]}}`
 var nestedObjAddPrimitiveArrayItem = `{"b":{"c":[250]}}`
 
+var ensureExistsStrategyTestCollections = Collections{
+	entitySets: EntitySets{
+		Path("$.t"):      Key("k"),
+		Path("$.t[*].v"): Key("nk"),
+	},
+	arrays: []string{}, // No arrays in this test, only sets
+}
+
 func TestCreatePatch_ModifyProperty_GeneratesReplaceOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObj), []byte(simpleObjModifyProp))
+	patch, err := CreatePatch([]byte(simpleObj), []byte(simpleObjModifyProp), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -63,7 +71,7 @@ func TestCreatePatch_ModifyProperty_GeneratesReplaceOperation(t *testing.T) {
 }
 
 func TestCreatePatch_AddProperty_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObj), []byte(simpleObjAddProp))
+	patch, err := CreatePatch([]byte(simpleObj), []byte(simpleObjAddProp), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -73,7 +81,7 @@ func TestCreatePatch_AddProperty_GeneratesAddOperation(t *testing.T) {
 }
 
 func TestCreatePatch_NestedObject_ModifyProperty_GeneratesReplaceOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(nestedObj), []byte(nestedObjModifyProp))
+	patch, err := CreatePatch([]byte(nestedObj), []byte(nestedObjModifyProp), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -84,7 +92,7 @@ func TestCreatePatch_NestedObject_ModifyProperty_GeneratesReplaceOperation(t *te
 }
 
 func TestCreatePatch_NestedObject_AddProperty_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(nestedObj), []byte(nestedObjAddProp))
+	patch, err := CreatePatch([]byte(nestedObj), []byte(nestedObjAddProp), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -94,7 +102,7 @@ func TestCreatePatch_NestedObject_AddProperty_GeneratesAddOperation(t *testing.T
 }
 
 func TestCreatePatch_EmptyPrimitiveArray_AddItem_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjEmtpyPrmitiveArray), []byte(simpleObjAddPrimitiveArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjEmtpyPrmitiveArray), []byte(simpleObjAddPrimitiveArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -105,7 +113,7 @@ func TestCreatePatch_EmptyPrimitiveArray_AddItem_GeneratesAddOperation(t *testin
 }
 
 func TestCreatePatch_SingletonPrimitiveArray_AddItem_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjSingletonPrimitiveArray), []byte(simpleObjAddPrimitiveArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjSingletonPrimitiveArray), []byte(simpleObjAddPrimitiveArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -116,7 +124,7 @@ func TestCreatePatch_SingletonPrimitiveArray_AddItem_GeneratesAddOperation(t *te
 }
 
 func TestCreatePatch_MultipleItemPrimitiveArray_AddItem_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjMultipleItemPrimitiveArray), []byte(simpleObjAddPrimitiveArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjMultipleItemPrimitiveArray), []byte(simpleObjAddPrimitiveArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -127,13 +135,13 @@ func TestCreatePatch_MultipleItemPrimitiveArray_AddItem_GeneratesAddOperation(t 
 }
 
 func TestCreatePatch_SingletonPrimitiveArray_AddDuplicateItem_GeneratesNoOperations(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjMultipleItemPrimitiveArray), []byte(simpleObjAddDuplicateArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjMultipleItemPrimitiveArray), []byte(simpleObjAddDuplicateArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(patch), "they should be equal")
 }
 
 func TestCreatePatch_NestedObject_PrimitiveArray_AddItem_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(nestedObjPrimitiveArray), []byte(nestedObjAddPrimitiveArrayItem))
+	patch, err := CreatePatch([]byte(nestedObjPrimitiveArray), []byte(nestedObjAddPrimitiveArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -144,7 +152,7 @@ func TestCreatePatch_NestedObject_PrimitiveArray_AddItem_GeneratesAddOperation(t
 }
 
 func TestCreatePatch_SingletonObjectArray_AddItem_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjSingletonObjectArray), []byte(simpleObjAddObjectArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjSingletonObjectArray), []byte(simpleObjAddObjectArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -155,7 +163,7 @@ func TestCreatePatch_SingletonObjectArray_AddItem_GeneratesAddOperation(t *testi
 }
 
 func TestCreatePatch_KeyValueArray_AddItem_GeneratesAddOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjKeyValueArray), []byte(simpleObjAddKeyValueArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjKeyValueArray), []byte(simpleObjAddKeyValueArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -166,13 +174,13 @@ func TestCreatePatch_KeyValueArray_AddItem_GeneratesAddOperation(t *testing.T) {
 }
 
 func TestCreatePatch_SingletonObjectArray_AddDuplicateItem_GeneratesNoOperations(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjSingletonObjectArray), []byte(simpleObjAddDuplicateObjectArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjSingletonObjectArray), []byte(simpleObjAddDuplicateObjectArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(patch), "they should be equal")
 }
 
 func TestCreatePatch_KeyValueArray_ModifyItem_GeneratesReplaceOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjKeyValueArray), []byte(simpleObjModifyKeyValueArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjKeyValueArray), []byte(simpleObjModifyKeyValueArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
 	change := patch[0]
@@ -183,13 +191,13 @@ func TestCreatePatch_KeyValueArray_ModifyItem_GeneratesReplaceOperation(t *testi
 }
 
 func TestCreatePatch_KeyValueArray_AddDuplicateItem_GeneratesNoOperations(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(simpleObjKeyValueArray), []byte(simpleObjAddDuplicateKeyValueArrayItem))
+	patch, err := CreatePatch([]byte(simpleObjKeyValueArray), []byte(simpleObjAddDuplicateKeyValueArrayItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(patch), "they should be equal")
 }
 
 func TestCreatePatch_ComplexNestedKeyValueArray_ModifyItem_GeneratesReplaceOperation(t *testing.T) {
-	patch, err := CreatePatch_StrategyEnsureExists([]byte(complexNextedKeyValueArray), []byte(complexNextedKeyValueArrayModifyItem))
+	patch, err := CreatePatch([]byte(complexNextedKeyValueArray), []byte(complexNextedKeyValueArrayModifyItem), ensureExistsStrategyTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(patch), "they should be equal")
 	change := patch[0]

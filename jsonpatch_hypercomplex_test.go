@@ -155,14 +155,18 @@ var hyperComplexA = `
 ]
 }`
 
+var hyperComplexTestCollections = Collections{
+	arrays: []string{"$.goods", "$.goods[*].batters.batter", "$.goods[*].topping"},
+}
+
 func TestHyperComplexSame(t *testing.T) {
-	patch, e := CreatePatch([]byte(hyperComplexBase), []byte(hyperComplexBase), false)
+	patch, e := CreatePatch([]byte(hyperComplexBase), []byte(hyperComplexBase), hyperComplexTestCollections, PatchStrategyExactMatch)
 	assert.NoError(t, e)
 	assert.Equal(t, len(patch), 0, "they should be equal")
 }
 
 func TestHyperComplexBoolReplace(t *testing.T) {
-	patch, e := CreatePatch([]byte(hyperComplexBase), []byte(hyperComplexA), false)
+	patch, e := CreatePatch([]byte(hyperComplexBase), []byte(hyperComplexA), hyperComplexTestCollections, PatchStrategyExactMatch)
 	assert.NoError(t, e)
 	assert.Equal(t, 3, len(patch), "they should be equal")
 	sort.Sort(ByPath(patch))

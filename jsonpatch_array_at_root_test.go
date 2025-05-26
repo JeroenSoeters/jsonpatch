@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestJSONPatchCreate(t *testing.T) {
+func TestJSONPatchCreate_ObjectRoot(t *testing.T) {
 	cases := map[string]struct {
 		a string
 		b string
@@ -19,6 +19,24 @@ func TestJSONPatchCreate(t *testing.T) {
 			`{"items":[{"asdf":"qwerty"}]}`,
 			`{"items":[{"asdf":"bla"},{"asdf":"zzz"}]}`,
 		},
+	}
+
+	collections := Collections{
+		arrays: []string{"$.items"},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := CreatePatch([]byte(tc.a), []byte(tc.b), collections, PatchStrategyExactMatch)
+			assert.NoError(t, err)
+		})
+	}
+}
+func TestJSONPatchCreate_ArrayRoot(t *testing.T) {
+	cases := map[string]struct {
+		a string
+		b string
+	}{
 		"array": {
 			`[{"asdf":"qwerty"}]`,
 			`[{"asdf":"bla"},{"asdf":"zzz"}]`,
@@ -33,9 +51,13 @@ func TestJSONPatchCreate(t *testing.T) {
 		},
 	}
 
+	collections := Collections{
+		arrays: []string{"$"},
+	}
+
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := CreatePatch([]byte(tc.a), []byte(tc.b), false)
+			_, err := CreatePatch([]byte(tc.a), []byte(tc.b), collections, PatchStrategyExactMatch)
 			assert.NoError(t, err)
 		})
 	}

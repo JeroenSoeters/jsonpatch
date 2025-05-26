@@ -27,40 +27,37 @@ func NewExactMatchStrategy(ignoreArrayOrder bool) ExactMatchStrategy {
 
 type Path string
 type Key string
-type SetIdentities map[Path]Key
+type EntitySets map[Path]Key
 
-// TODO: write test for this
-func NewPath(path string) Path {
-	if path == "" || path == "/" {
-		return Path("$")
-	}
-
-	parts := strings.Split(path, "/")
-	var jsonPathParts []string
-
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-
-		_, err := strconv.Atoi(part)
-		if err == nil {
-			jsonPathParts = append(jsonPathParts, "[*]")
-		} else {
-			jsonPathParts = append(jsonPathParts, "."+part)
-		}
-	}
-	return Path("$" + strings.Join(jsonPathParts, ""))
+type Collections struct {
+	entitySets EntitySets
+	arrays     []string
 }
 
-func (s SetIdentities) Add(path Path, key Key) {
+func (c *Collections) isArray(path string) bool {
+	jsonPath := toJsonPath(path)
+	for _, array := range c.arrays {
+		if jsonPath == array {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Collections) isEntitySet(path string) bool {
+	jsonPath := toJsonPath(path)
+	_, ok := c.entitySets[Path(jsonPath)]
+	return ok
+}
+
+func (s EntitySets) Add(path Path, key Key) {
 	if s == nil {
-		s = make(SetIdentities)
+		s = make(EntitySets)
 	}
 	s[path] = key
 }
 
-func (s SetIdentities) Get(path Path) (Key, bool) {
+func (s EntitySets) Get(path Path) (Key, bool) {
 	if s == nil {
 		return "", false
 	}
@@ -92,19 +89,13 @@ func toJsonPath(path string) string {
 	return "$" + strings.Join(jsonPathParts, "")
 }
 
-type EnsureExistsStrategy struct {
-	setKeys SetIdentities
-}
+type PatchStrategy string
 
-func (EnsureExistsStrategy) isStrategy() {}
-
-type EnsureAbsentStrategy struct{}
-
-func NewEnsureExistsStrategy(setKeys SetIdentities) EnsureExistsStrategy {
-	return EnsureExistsStrategy{setKeys: setKeys}
-}
-
-func (EnsureAbsentStrategy) isStrategy() {}
+const (
+	PatchStrategyExactMatch   PatchStrategy = "exact-match"
+	PatchStrategyEnsureExists PatchStrategy = "ensure-exists"
+	PatchStrategyEnsureAbsent PatchStrategy = "ensure-absent"
+)
 
 type JsonPatchOperation struct {
 	Operation string `json:"op"`
@@ -152,7 +143,7 @@ func NewPatch(operation, path string, value any) JsonPatchOperation {
 // If ignoreArrayOrder is true, arrays with the same elements but in different order will be considered equal
 //
 // An e rror will be returned if any of the two documents are invalid.
-func CreatePatch(a, b []byte, ignoreArrayOrder bool) ([]JsonPatchOperation, error) {
+func CreatePatch(a, b []byte, collections Collections, strategy PatchStrategy) ([]JsonPatchOperation, error) {
 	var aI any
 	var bI any
 
@@ -165,7 +156,7 @@ func CreatePatch(a, b []byte, ignoreArrayOrder bool) ([]JsonPatchOperation, erro
 		return nil, errBadJSONDoc
 	}
 
-	return handleValues(aI, bI, "", []JsonPatchOperation{}, NewExactMatchStrategy(ignoreArrayOrder))
+	return handleValues(aI, bI, "", []JsonPatchOperation{}, strategy, collections)
 }
 
 func CreatePatch_StrategyEnsureExists(a, b []byte) ([]JsonPatchOperation, error) {
@@ -180,12 +171,17 @@ func CreatePatch_StrategyEnsureExists(a, b []byte) ([]JsonPatchOperation, error)
 	if err != nil {
 		return nil, errBadJSONDoc
 	}
-	sets := SetIdentities{
+
+	entitySets := EntitySets{
 		Path("$.t"):      Key("k"),
 		Path("$.t[*].v"): Key("nk"),
 	}
+	collections := Collections{
+		entitySets: entitySets,
+		arrays:     []string{},
+	}
 
-	return handleValues(aI, bI, "", []JsonPatchOperation{}, NewEnsureExistsStrategy(sets))
+	return handleValues(aI, bI, "", []JsonPatchOperation{}, PatchStrategyEnsureExists, collections)
 }
 
 // Returns true if the values matches (must be json types)
@@ -306,9 +302,9 @@ func makePath(path string, newPart any) string {
 }
 
 // diff returns the (recursive) difference between a and b as an array of JsonPatchOperations.
-func diff(a, b map[string]any, path string, patch []JsonPatchOperation, strategy Strategy) ([]JsonPatchOperation, error) {
-	switch strategy.(type) {
-	case ExactMatchStrategy:
+func diff(a, b map[string]any, path string, patch []JsonPatchOperation, strategy PatchStrategy, collections Collections) ([]JsonPatchOperation, error) {
+	switch strategy {
+	case PatchStrategyExactMatch:
 		for key, bv := range b {
 			p := makePath(path, key)
 			av, ok := a[key]
@@ -324,7 +320,7 @@ func diff(a, b map[string]any, path string, patch []JsonPatchOperation, strategy
 			}
 			// Types are the same, compare values
 			var err error
-			patch, err = handleValues(av, bv, p, patch, strategy)
+			patch, err = handleValues(av, bv, p, patch, strategy, collections)
 			if err != nil {
 				return nil, err
 			}
@@ -339,7 +335,7 @@ func diff(a, b map[string]any, path string, patch []JsonPatchOperation, strategy
 			}
 		}
 		return patch, nil
-	case EnsureExistsStrategy:
+	case PatchStrategyEnsureExists:
 		for key, bv := range b {
 			p := makePath(path, key)
 			av, ok := a[key]
@@ -355,69 +351,56 @@ func diff(a, b map[string]any, path string, patch []JsonPatchOperation, strategy
 			}
 			// Types are the same, compare values
 			var err error
-			patch, err = handleValues(av, bv, p, patch, strategy)
+			patch, err = handleValues(av, bv, p, patch, strategy, collections)
 			if err != nil {
 				return nil, err
 			}
 		}
 		// We don't generate remove operations in "ensure exists" mode
 		return patch, nil
-	case EnsureAbsentStrategy:
+	case PatchStrategyEnsureAbsent:
 		fmt.Println("EnsureAbsent strategy is not implemented yet")
 	}
 
 	return nil, fmt.Errorf("Unknown strategy: %s", strategy)
 }
 
-func handleValues(av, bv any, p string, patch []JsonPatchOperation, strategy Strategy) ([]JsonPatchOperation, error) {
+func handleValues(av, bv any, p string, patch []JsonPatchOperation, strategy PatchStrategy, collections Collections) ([]JsonPatchOperation, error) {
 	var err error
-	ignoreArrayOrder := false
-	if s, ok := strategy.(ExactMatchStrategy); ok {
-		ignoreArrayOrder = s.ignoreArrayOrder
-	}
+	ignoreArrayOrder := !collections.isArray(p)
 	switch at := av.(type) {
 	case map[string]any:
 		bt := bv.(map[string]any)
-		patch, err = diff(at, bt, p, patch, strategy)
+		patch, err = diff(at, bt, p, patch, strategy, collections)
 		if err != nil {
 			return nil, err
 		}
+		return patch, nil
 	case string, float64, bool:
 		if !matchesValue(av, bv, ignoreArrayOrder) {
 			patch = append(patch, NewPatch("replace", p, bv))
 		}
+		return patch, nil
 	case []any:
-		switch strategy.(type) {
-		case ExactMatchStrategy:
-			bt, ok := bv.([]any)
-			if !ok {
-				// array replaced by non-array
-				patch = append(patch, NewPatch("replace", p, bv))
-			} else if len(at) != len(bt) {
-				// arrays are not the same length
-				patch = append(patch, compareArray(at, bt, p, strategy)...)
-			} else if ignoreArrayOrder && matchesValue(at, bt, true) {
-				// Arrays have the same elements, just in different order, and we're ignoring order
-				// No patch needed!
-			} else {
-				for i := range bt {
-					patch, err = handleValues(at[i], bt[i], makePath(p, i), patch, strategy)
-					if err != nil {
-						return nil, err
-					}
+		bt, replaceWithOtherCollection := bv.([]any)
+		switch {
+		case !replaceWithOtherCollection:
+			patch = append(patch, NewPatch("replace", p, bv))
+		case collections.isArray(p) && len(at) != len(bt):
+			patch = append(patch, compareArray(at, bt, p, strategy, collections)...)
+		case collections.isArray(p) && len(at) == len(bt):
+			// If arrays have the same length, we can compare them element by element
+			for i := range bt {
+				patch, err = handleValues(at[i], bt[i], makePath(p, i), patch, strategy, collections)
+				if err != nil {
+					return nil, err
 				}
 			}
-		case EnsureExistsStrategy:
-			bt, ok := bv.([]any)
-			if !ok {
-				// array replaced by non-array
-				patch = append(patch, NewPatch("replace", p, bv))
-			} else {
-				// compare arrays
-				patch = append(patch, compareArray(at, bt, p, strategy)...)
+		default:
+			// If this is not an array, we treat it as a set of values.
+			if !matchesValue(at, bt, true) {
+				patch = append(patch, compareArray(at, bt, p, strategy, collections)...)
 			}
-		case EnsureAbsentStrategy:
-			return nil, fmt.Errorf("EnsureAbsent strategy is not implemented for arrays")
 		}
 	case nil:
 		switch bv.(type) {
@@ -433,19 +416,20 @@ func handleValues(av, bv any, p string, patch []JsonPatchOperation, strategy Str
 }
 
 // compareArray generates remove and add operations for `av` and `bv`.
-func compareArray(av, bv []any, p string, strategy Strategy) []JsonPatchOperation {
+func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Collections) []JsonPatchOperation {
 	retval := []JsonPatchOperation{}
+	ignoreArrayOrder := !collections.isArray(p)
 
-	switch s := strategy.(type) {
-	case ExactMatchStrategy:
+	switch strategy {
+	case PatchStrategyExactMatch:
 		// If arrays have same elements in different order and we're ignoring order, return empty patch
-		if s.ignoreArrayOrder && len(av) == len(bv) && matchesValue(av, bv, true) {
+		if len(av) == len(bv) && matchesValue(av, bv, true) {
 			return retval
 		}
 		// Find elements that need to be removed
-		processArray(av, bv, p, func(i int, value any) {
+		processArray(av, bv, func(i int, value any) {
 			retval = append(retval, NewPatch("remove", makePath(p, i), nil))
-		}, strategy)
+		}, strategy, ignoreArrayOrder)
 
 		reversed := make([]JsonPatchOperation, len(retval))
 		for i := 0; i < len(retval); i++ {
@@ -455,29 +439,29 @@ func compareArray(av, bv []any, p string, strategy Strategy) []JsonPatchOperatio
 
 		// Find elements that need to be added.
 		// NOTE we pass in `bv` then `av` so that processArray can find the missing elements.
-		processArray(bv, av, p, func(i int, value any) {
+		processArray(bv, av, func(i int, value any) {
 			retval = append(retval, NewPatch("add", makePath(p, i), value))
-		}, strategy)
-	case EnsureExistsStrategy:
-		if _, ok := s.setKeys.Get(Path(toJsonPath(p))); ok {
+		}, strategy, ignoreArrayOrder)
+	case PatchStrategyEnsureExists:
+		if collections.isEntitySet(p) {
 			processIdentitySet(bv, av, p, func(i int, value any) {
 				retval = append(retval, NewPatch("add", makePath(p, i), value))
 			}, func(ops []JsonPatchOperation) {
 				retval = append(retval, ops...)
-			}, strategy)
+			}, strategy, collections)
 		} else {
-			processArray(bv, av, p, func(i int, value any) {
+			processArray(bv, av, func(i int, value any) {
 				retval = append(retval, NewPatch("add", makePath(p, i), value))
-			}, strategy)
+			}, strategy, ignoreArrayOrder)
 		}
-	case EnsureAbsentStrategy:
+	case PatchStrategyEnsureAbsent:
 		return nil
 	}
 
 	return retval
 }
 
-func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy Strategy) {
+func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy PatchStrategy, collections Collections) {
 	foundIndexes := make(map[int]struct{}, len(av))
 	bvCounts := make(map[string]int)
 	lookup := make(map[string]int)
@@ -486,7 +470,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 
 	for i, v := range bv {
 		jsonBytes, err := json.Marshal(v)
-		if key, ok := strategy.(EnsureExistsStrategy).setKeys.Get(Path(toJsonPath(path))); ok {
+		if key, ok := collections.entitySets.Get(Path(toJsonPath(path))); ok {
 			jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
 		}
 		if err != nil {
@@ -500,7 +484,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 	// Check each element in av
 	for i, v := range av {
 		jsonBytes, err := json.Marshal(v)
-		if key, ok := strategy.(EnsureExistsStrategy).setKeys.Get(Path(toJsonPath(path))); ok {
+		if key, ok := collections.entitySets.Get(Path(toJsonPath(path))); ok {
 			jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
 		}
 		if err != nil {
@@ -513,7 +497,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 		if index, ok := lookup[jsonStr]; ok {
 			foundIndexes[i] = struct{}{}
 			bvSeen[jsonStr]++
-			updateOps, err := handleValues(bv[index], v, fmt.Sprintf("%s/%d", path, lookup[jsonStr]), []JsonPatchOperation{}, strategy)
+			updateOps, err := handleValues(bv[index], v, fmt.Sprintf("%s/%d", path, lookup[jsonStr]), []JsonPatchOperation{}, strategy, collections)
 			if err != nil {
 				return
 			}
@@ -531,27 +515,23 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 
 // processArray processes `av` and `bv` calling `applyOp` whenever a value is absent.
 // It keeps track of which indexes have already had `applyOp` called for and automatically skips them so you can process duplicate objects correctly.
-func processArray(av, bv []any, path string, applyOp func(i int, value any), strategy Strategy) {
+func processArray(av, bv []any, applyOp func(i int, value any), strategy PatchStrategy, ignoreArrayOrder bool) {
 	foundIndexes := make(map[int]struct{}, len(av))
-	reverseFoundIndexes := make(map[int]struct{}, len(av))
+	bvElements := make(map[string]struct{})
+	reverseFoundIndexes := make(map[int]struct{}, len(bv))
 
-	switch s := strategy.(type) {
-	case ExactMatchStrategy:
-		if s.ignoreArrayOrder {
-			// Create a map of elements and their counts in bv
-			bvCounts := make(map[string]int)
-			bvSeen := make(map[string]int) // Track how many we've seen during processing
-
+	switch strategy {
+	case PatchStrategyExactMatch:
+		if ignoreArrayOrder {
 			for _, v := range bv {
 				jsonBytes, err := json.Marshal(v)
 				if err != nil {
 					continue // Skip if we can't marshal
 				}
 				jsonStr := string(jsonBytes)
-				bvCounts[jsonStr]++
+				bvElements[jsonStr] = struct{}{}
 			}
 
-			// Check each element in av
 			for i, v := range av {
 				jsonBytes, err := json.Marshal(v)
 				if err != nil {
@@ -561,15 +541,7 @@ func processArray(av, bv []any, path string, applyOp func(i int, value any), str
 
 				jsonStr := string(jsonBytes)
 				// If element exists in bv and we haven't seen all of them yet
-				if bvCounts[jsonStr] > bvSeen[jsonStr] {
-					foundIndexes[i] = struct{}{}
-					bvSeen[jsonStr]++
-				}
-			}
-
-			// Apply op for all elements in av that weren't found
-			for i, v := range av {
-				if _, ok := foundIndexes[i]; !ok {
+				if _, ok := bvElements[jsonStr]; !ok {
 					applyOp(i, v)
 				}
 			}
@@ -593,7 +565,7 @@ func processArray(av, bv []any, path string, applyOp func(i int, value any), str
 				}
 			}
 		}
-	case EnsureExistsStrategy:
+	case PatchStrategyEnsureExists:
 		offset := len(bv)
 		// Create a map of elements and their counts in bv
 		bvCounts := make(map[string]int)
@@ -631,7 +603,7 @@ func processArray(av, bv []any, path string, applyOp func(i int, value any), str
 			}
 		}
 		return
-	case EnsureAbsentStrategy:
+	case PatchStrategyEnsureAbsent:
 		return
 	}
 }
