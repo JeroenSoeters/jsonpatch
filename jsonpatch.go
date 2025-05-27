@@ -159,31 +159,6 @@ func CreatePatch(a, b []byte, collections Collections, strategy PatchStrategy) (
 	return handleValues(aI, bI, "", []JsonPatchOperation{}, strategy, collections)
 }
 
-func CreatePatch_StrategyEnsureExists(a, b []byte) ([]JsonPatchOperation, error) {
-	var aI any
-	var bI any
-
-	err := json.Unmarshal(a, &aI)
-	if err != nil {
-		return nil, errBadJSONDoc
-	}
-	err = json.Unmarshal(b, &bI)
-	if err != nil {
-		return nil, errBadJSONDoc
-	}
-
-	entitySets := EntitySets{
-		Path("$.t"):      Key("k"),
-		Path("$.t[*].v"): Key("nk"),
-	}
-	collections := Collections{
-		entitySets: entitySets,
-		arrays:     []string{},
-	}
-
-	return handleValues(aI, bI, "", []JsonPatchOperation{}, PatchStrategyEnsureExists, collections)
-}
-
 // Returns true if the values matches (must be json types)
 // The types of the values must match, otherwise it will always return false
 // If two map[string]any are given, all elements must match.
@@ -385,6 +360,7 @@ func handleValues(av, bv any, p string, patch []JsonPatchOperation, strategy Pat
 		bt, replaceWithOtherCollection := bv.([]any)
 		switch {
 		case !replaceWithOtherCollection:
+			// If the types are different, we replace the whole array
 			patch = append(patch, NewPatch("replace", p, bv))
 		case collections.isArray(p) && len(at) != len(bt):
 			patch = append(patch, compareArray(at, bt, p, strategy, collections)...)
@@ -418,67 +394,137 @@ func handleValues(av, bv any, p string, patch []JsonPatchOperation, strategy Pat
 // compareArray generates remove and add operations for `av` and `bv`.
 func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Collections) []JsonPatchOperation {
 	retval := []JsonPatchOperation{}
-	ignoreArrayOrder := !collections.isArray(p)
 
-	switch strategy {
-	case PatchStrategyExactMatch:
-		// If arrays have same elements in different order and we're ignoring order, return empty patch
-		if len(av) == len(bv) && matchesValue(av, bv, true) {
-			return retval
+	switch {
+	case collections.isArray(p):
+		if strategy == PatchStrategyExactMatch {
+			// Find elements that need to be removed
+			processArray(av, bv, func(i int, value any) {
+				retval = append(retval, NewPatch("remove", makePath(p, i), nil))
+			}, strategy)
+			reversed := make([]JsonPatchOperation, len(retval))
+			for i := 0; i < len(retval); i++ {
+				reversed[len(retval)-1-i] = retval[i]
+			}
+			retval = reversed
 		}
-		// Find elements that need to be removed
-		processArray(av, bv, func(i int, value any) {
-			retval = append(retval, NewPatch("remove", makePath(p, i), nil))
-		}, strategy, ignoreArrayOrder)
-
-		reversed := make([]JsonPatchOperation, len(retval))
-		for i := 0; i < len(retval); i++ {
-			reversed[len(retval)-1-i] = retval[i]
-		}
-		retval = reversed
 
 		// Find elements that need to be added.
 		// NOTE we pass in `bv` then `av` so that processArray can find the missing elements.
 		processArray(bv, av, func(i int, value any) {
 			retval = append(retval, NewPatch("add", makePath(p, i), value))
-		}, strategy, ignoreArrayOrder)
-	case PatchStrategyEnsureExists:
-		if collections.isEntitySet(p) {
-			processIdentitySet(bv, av, p, func(i int, value any) {
-				retval = append(retval, NewPatch("add", makePath(p, i), value))
+		}, strategy)
+	case collections.isEntitySet(p):
+		if len(av) == len(bv) && matchesValue(av, bv, true) {
+			return retval
+		}
+		// TODO: removing is not tested yest!
+		if strategy == PatchStrategyExactMatch {
+			// Find elements that need to be removed
+			processIdentitySet(av, bv, p, func(i int, value any) {
+				retval = append(retval, NewPatch("remove", makePath(p, i), nil))
 			}, func(ops []JsonPatchOperation) {
 				retval = append(retval, ops...)
 			}, strategy, collections)
-		} else {
-			processArray(bv, av, func(i int, value any) {
-				retval = append(retval, NewPatch("add", makePath(p, i), value))
-			}, strategy, ignoreArrayOrder)
+			reversed := make([]JsonPatchOperation, len(retval))
+			for i := 0; i < len(retval); i++ {
+				reversed[len(retval)-1-i] = retval[i]
+			}
+			retval = reversed
 		}
-	case PatchStrategyEnsureAbsent:
-		return nil
+		processIdentitySet(bv, av, p, func(i int, value any) {
+			retval = append(retval, NewPatch("add", makePath(p, i), value))
+		}, func(ops []JsonPatchOperation) {
+			retval = append(retval, ops...)
+		}, strategy, collections)
+	default: // default to set
+		if len(av) == len(bv) && matchesValue(av, bv, true) {
+			return retval
+		}
+		// TODO: removing is not tested yest!
+		// also we need to check for PatchStrategyEnsureAbsent
+		if strategy == PatchStrategyExactMatch {
+			// Find elements that need to be removed
+			processSet(av, bv, p, func(i int, value any) {
+				retval = append(retval, NewPatch("remove", makePath(p, i), nil))
+			}, func(ops []JsonPatchOperation) {
+				retval = append(retval, ops...)
+			}, strategy, collections)
+			reversed := make([]JsonPatchOperation, len(retval))
+			for i := 0; i < len(retval); i++ {
+				reversed[len(retval)-1-i] = retval[i]
+			}
+			retval = reversed
+		}
+
+		processSet(bv, av, p, func(i int, value any) {
+			retval = append(retval, NewPatch("add", makePath(p, i), value))
+		}, func(ops []JsonPatchOperation) {
+			retval = append(retval, ops...)
+		}, strategy, collections)
 	}
 
 	return retval
 }
 
-func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy PatchStrategy, collections Collections) {
+func processSet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy PatchStrategy, collections Collections) {
 	foundIndexes := make(map[int]struct{}, len(av))
-	bvCounts := make(map[string]int)
 	lookup := make(map[string]int)
-	bvSeen := make(map[string]int) // Track how many we've seen during processing
 	offset := len(bv)
 
 	for i, v := range bv {
 		jsonBytes, err := json.Marshal(v)
-		if key, ok := collections.entitySets.Get(Path(toJsonPath(path))); ok {
-			jsonBytes, err = json.Marshal(v.(map[string]any)[string(key)])
-		}
 		if err != nil {
 			continue // Skip if we can't marshal
 		}
 		jsonStr := string(jsonBytes)
 		lookup[jsonStr] = i
-		bvCounts[jsonStr]++
+	}
+
+	// Check each element in av
+	for i, v := range av {
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			applyOp(i+offset, v) // If we can't marshal, treat it as not found
+			continue
+		}
+
+		jsonStr := string(jsonBytes)
+		// If element exists in bv and we haven't seen all of them yet
+		if index, ok := lookup[jsonStr]; ok {
+			foundIndexes[i] = struct{}{}
+			updateOps, err := handleValues(bv[index], v, fmt.Sprintf("%s/%d", path, lookup[jsonStr]), []JsonPatchOperation{}, strategy, collections)
+			if err != nil {
+				return
+			}
+			replaceOps(updateOps)
+		}
+	}
+
+	// Apply op for all elements in av that weren't found
+	for i, v := range av {
+		if _, ok := foundIndexes[i]; !ok {
+			applyOp(i+offset, v)
+		}
+	}
+}
+
+func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy PatchStrategy, collections Collections) {
+	foundIndexes := make(map[int]struct{}, len(av))
+	lookup := make(map[string]int)
+	offset := len(bv)
+
+	for i, v := range bv {
+		var key = ""
+		if _, ok := collections.entitySets.Get(Path(toJsonPath(path))); !ok {
+			continue // If we don't have a key for this path, skip
+		}
+		jsonBytes, err := json.Marshal(v.(map[string]any)[string(key)])
+		if err != nil {
+			continue // Skip if we can't marshal
+		}
+		jsonStr := string(jsonBytes)
+		lookup[jsonStr] = i
 	}
 
 	// Check each element in av
@@ -496,7 +542,6 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 		// If element exists in bv and we haven't seen all of them yet
 		if index, ok := lookup[jsonStr]; ok {
 			foundIndexes[i] = struct{}{}
-			bvSeen[jsonStr]++
 			updateOps, err := handleValues(bv[index], v, fmt.Sprintf("%s/%d", path, lookup[jsonStr]), []JsonPatchOperation{}, strategy, collections)
 			if err != nil {
 				return
