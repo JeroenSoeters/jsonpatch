@@ -156,7 +156,7 @@ var hyperComplexA = `
 }`
 
 var hyperComplexTestCollections = Collections{
-	arrays: []string{"$.goods", "$.goods[*].batters.batter", "$.goods[*].topping"},
+	Arrays: []string{"$.goods", "$.goods[*].batters.batter", "$.goods[*].topping"},
 }
 
 func TestHyperComplexSame(t *testing.T) {
@@ -178,7 +178,7 @@ func TestHyperComplexBoolReplace(t *testing.T) {
 	change = patch[1]
 	assert.Equal(t, "add", change.Operation, "they should be equal")
 	assert.Equal(t, "/goods/2/batters/batter/2", change.Path, "they should be equal")
-	assert.Equal(t, map[string]interface{}{"id": "1003", "type": "Vanilla"}, change.Value, "they should be equal")
+	assert.Equal(t, map[string]any{"id": "1003", "type": "Vanilla"}, change.Value, "they should be equal")
 	change = patch[2]
 	assert.Equal(t, change.Operation, "remove", "they should be equal")
 	assert.Equal(t, change.Path, "/goods/2/topping/2", "they should be equal")

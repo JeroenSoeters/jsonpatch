@@ -96,7 +96,7 @@ func BenchmarkBigArrays(b *testing.B) {
 	a1 = make([]any, 100)
 	a2 = make([]any, 101)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		a1[i] = i
 		a2[i+1] = i
 	}
@@ -110,7 +110,7 @@ func BenchmarkBigArrays2(b *testing.B) {
 	a1 = make([]any, 100)
 	a2 = make([]any, 101)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		a1[i] = i
 		a2[i] = i
 	}

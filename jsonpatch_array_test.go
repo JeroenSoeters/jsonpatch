@@ -17,7 +17,7 @@ var (
 }`
 
 	arrayTestCollections = Collections{
-		arrays: []string{"$.persons"},
+		Arrays: []string{"$.persons"},
 	}
 )
 
@@ -31,7 +31,7 @@ func TestArrayAddMultipleEmptyObjects(t *testing.T) {
 	change := patch[0]
 	assert.Equal(t, "add", change.Operation, "they should be equal")
 	assert.Equal(t, "/persons/2", change.Path, "they should be equal")
-	assert.Equal(t, map[string]interface{}{}, change.Value, "they should be equal")
+	assert.Equal(t, map[string]any{}, change.Value, "they should be equal")
 }
 
 func TestArrayRemoveMultipleEmptyObjects(t *testing.T) {

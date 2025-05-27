@@ -10,7 +10,7 @@ import (
 var point = `{"type":"Point", "coordinates":[0.0, 1.0]}`
 var lineString = `{"type":"LineString", "coordinates":[[0.0, 1.0], [2.0, 3.0]]}`
 var geotestCollections = Collections{
-	arrays: []string{"$.coordinates"},
+	Arrays: []string{"$.coordinates"},
 }
 
 func TestPointLineStringReplace(t *testing.T) {
@@ -21,11 +21,11 @@ func TestPointLineStringReplace(t *testing.T) {
 	change := patch[0]
 	assert.Equal(t, change.Operation, "replace", "they should be equal")
 	assert.Equal(t, change.Path, "/coordinates/0", "they should be equal")
-	assert.Equal(t, change.Value, []interface{}{0.0, 1.0}, "they should be equal")
+	assert.Equal(t, change.Value, []any{0.0, 1.0}, "they should be equal")
 	change = patch[1]
 	assert.Equal(t, change.Operation, "replace", "they should be equal")
 	assert.Equal(t, change.Path, "/coordinates/1", "they should be equal")
-	assert.Equal(t, change.Value, []interface{}{2.0, 3.0}, "they should be equal")
+	assert.Equal(t, change.Value, []any{2.0, 3.0}, "they should be equal")
 	change = patch[2]
 	assert.Equal(t, change.Operation, "replace", "they should be equal")
 	assert.Equal(t, change.Path, "/type", "they should be equal")

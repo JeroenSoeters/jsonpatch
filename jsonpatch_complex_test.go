@@ -15,7 +15,7 @@ var complexD = `{"a":100, "b":[{"c1":"hello", "d1":"foo"},{"c2":"hello2", "d2":"
 var complexE = `{"a":100, "b":[{"c1":"hello", "d1":"foo"},{"c2":"hello2", "d2":"foo2"} ], "e":{"f":200, "g":"h", "i":"j"}}`
 
 var complex_test_collections = Collections{
-	arrays: []string{"$.b"},
+	Arrays: []string{"$.b"},
 }
 
 func TestComplexSame(t *testing.T) {
@@ -51,11 +51,11 @@ func TestComplexOneAdd(t *testing.T) {
 	change := patch[0]
 	assert.Equal(t, "add", change.Operation, "they should be equal")
 	assert.Equal(t, "/k", change.Path, "they should be equal")
-	a := make(map[string]interface{})
-	b := make(map[string]interface{})
+	a := make(map[string]any)
+	b := make(map[string]any)
 	a["l"] = "m"
 	b["l"] = "o"
-	expected := []interface{}{a, b}
+	expected := []any{a, b}
 	assert.Equal(t, expected, change.Value, "they should be equal")
 }
 
@@ -66,11 +66,11 @@ func TestComplexOneAddToArray(t *testing.T) {
 	change := patch[0]
 	assert.Equal(t, "add", change.Operation, "they should be equal")
 	assert.Equal(t, "/k", change.Path, "they should be equal")
-	a := make(map[string]interface{})
-	b := make(map[string]interface{})
+	a := make(map[string]any)
+	b := make(map[string]any)
 	a["l"] = "m"
 	b["l"] = "o"
-	expected := []interface{}{a, b}
+	expected := []any{a, b}
 	assert.Equal(t, expected, change.Value, "they should be equal")
 }
 

@@ -17,18 +17,18 @@ type Key string
 type EntitySets map[Path]Key
 
 type Collections struct {
-	entitySets EntitySets
-	arrays     []string
+	EntitySets EntitySets
+	Arrays     []string
 }
 
 func (c *Collections) isArray(path string) bool {
 	jsonPath := toJsonPath(path)
-	return slices.Contains(c.arrays, jsonPath)
+	return slices.Contains(c.Arrays, jsonPath)
 }
 
 func (c *Collections) isEntitySet(path string) bool {
 	jsonPath := toJsonPath(path)
-	_, ok := c.entitySets[Path(jsonPath)]
+	_, ok := c.EntitySets[Path(jsonPath)]
 	return ok
 }
 
@@ -458,7 +458,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 	offset := len(bv)
 
 	for i, v := range bv {
-		key, ok := collections.entitySets.Get(Path(toJsonPath(path)))
+		key, ok := collections.EntitySets.Get(Path(toJsonPath(path)))
 		if !ok {
 			continue // If we don't have a key for this path, skip
 		}
@@ -471,7 +471,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 	}
 
 	for i, v := range av {
-		key, ok := collections.entitySets.Get(Path(toJsonPath(path)))
+		key, ok := collections.EntitySets.Get(Path(toJsonPath(path)))
 		if !ok {
 			continue // If we don't have a key for this path, skip
 		}
