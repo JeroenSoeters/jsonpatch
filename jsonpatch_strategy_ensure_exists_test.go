@@ -52,11 +52,11 @@ var nestedObjPrimitiveArray = `{"a":100, "b":{"c":[200]}}`
 var nestedObjAddPrimitiveArrayItem = `{"b":{"c":[250]}}`
 
 var ensureExistsStrategyTestCollections = Collections{
-	entitySets: EntitySets{
+	EntitySets: EntitySets{
 		Path("$.t"):      Key("k"),
 		Path("$.t[*].v"): Key("nk"),
 	},
-	arrays: []string{}, // No arrays in this test, only sets
+	Arrays: []string{}, // No arrays in this test, only sets
 }
 
 func TestCreatePatch_ModifyProperty_GeneratesReplaceOperation(t *testing.T) {
