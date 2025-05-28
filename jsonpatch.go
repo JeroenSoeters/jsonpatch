@@ -282,17 +282,17 @@ func diff(a, b map[string]any, path string, patch []JsonPatchOperation, strategy
 			return nil, err
 		}
 	}
-	if strategy == PatchStrategyExactMatch {
-		// Now add all deleted values as nil
-		for key := range a {
-			_, found := b[key]
-			if !found {
-				_ = makePath(path, key)
-
-				//				patch = append(patch, NewPatch("remove", p, nil))
-			}
-		}
-	}
+	// Leaving this here for now, but the current thinking is that we never remove properties from objects.
+	//	if strategy == PatchStrategyExactMatch {
+	//		// Now add all deleted values as nil
+	//		for key := range a {
+	//			_, found := b[key]
+	//			if !found {
+	//                p := makePath(path, key)
+	//				patch = append(patch, NewPatch("remove", p, nil))
+	//			}
+	//		}
+	//	}
 	return patch, nil
 }
 
