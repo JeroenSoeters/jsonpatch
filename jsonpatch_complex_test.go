@@ -14,7 +14,7 @@ var complexD = `{"a":100, "b":[{"c1":"hello", "d1":"foo"},{"c2":"hello2", "d2":"
 var complexE = `{"a":100, "b":[{"c1":"hello", "d1":"foo"},{"c2":"hello2", "d2":"foo2"} ], "e":{"f":200, "g":"h", "i":"j"}}`
 
 var complex_test_collections = Collections{
-	Arrays: []string{"$.b"},
+	Arrays: []Path{"$.b"},
 }
 
 func TestComplexSame(t *testing.T) {

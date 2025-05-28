@@ -17,7 +17,7 @@ var (
 }`
 
 	arrayTestCollections = Collections{
-		Arrays: []string{"$.persons"},
+		Arrays: []Path{"$.persons"},
 	}
 )
 

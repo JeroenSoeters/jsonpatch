@@ -156,7 +156,7 @@ var hyperComplexA = `
 }`
 
 var hyperComplexTestCollections = Collections{
-	Arrays: []string{"$.goods", "$.goods[*].batters.batter", "$.goods[*].topping"},
+	Arrays: []Path{"$.goods", "$.goods[*].batters.batter", "$.goods[*].topping"},
 }
 
 func TestHyperComplexSame(t *testing.T) {

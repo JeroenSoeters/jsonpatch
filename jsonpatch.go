@@ -18,12 +18,12 @@ type EntitySets map[Path]Key
 
 type Collections struct {
 	EntitySets EntitySets
-	Arrays     []string
+	Arrays     []Path
 }
 
 func (c *Collections) isArray(path string) bool {
 	jsonPath := toJsonPath(path)
-	return slices.Contains(c.Arrays, jsonPath)
+	return slices.Contains(c.Arrays, Path(jsonPath))
 }
 
 func (c *Collections) isEntitySet(path string) bool {

@@ -10,7 +10,7 @@ import (
 var point = `{"type":"Point", "coordinates":[0.0, 1.0]}`
 var lineString = `{"type":"LineString", "coordinates":[[0.0, 1.0], [2.0, 3.0]]}`
 var geotestCollections = Collections{
-	Arrays: []string{"$.coordinates"},
+	Arrays: []Path{"$.coordinates"},
 }
 
 func TestPointLineStringReplace(t *testing.T) {

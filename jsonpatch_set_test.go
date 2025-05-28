@@ -24,7 +24,7 @@ var nestedObjAddPrimitiveSetItem = `{"b":{"c":[250]}}`
 
 var setTestCollections = Collections{
 	EntitySets: EntitySets{},
-	Arrays:     []string{}, // No arrays in this test, only sets
+	Arrays:     []Path{}, // No arrays in this test, only sets
 }
 
 func TestCreatePatch_AddItemToEmptyPrimitiveSetInEnsureExistsMode_GeneratesAddOperation(t *testing.T) {

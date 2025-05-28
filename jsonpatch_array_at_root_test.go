@@ -22,7 +22,7 @@ func TestJSONPatchCreate_ObjectRoot(t *testing.T) {
 	}
 
 	collections := Collections{
-		Arrays: []string{"$.items"},
+		Arrays: []Path{"$.items"},
 	}
 
 	for name, tc := range cases {
@@ -52,7 +52,7 @@ func TestJSONPatchCreate_ArrayRoot(t *testing.T) {
 	}
 
 	collections := Collections{
-		Arrays: []string{"$"},
+		Arrays: []Path{"$"},
 	}
 
 	for name, tc := range cases {

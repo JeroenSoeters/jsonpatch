@@ -39,7 +39,7 @@ var entitySetTestCollections = Collections{
 		Path("$.t"):      Key("k"),
 		Path("$.t[*].v"): Key("nk"),
 	},
-	Arrays: []string{}, // No arrays in this test, only sets
+	Arrays: []Path{}, // No arrays in this test, only sets
 }
 
 func TestCreatePatch_AddItemToEntitySet_InEnsureExistsMode_GeneratesAddOperation(t *testing.T) {

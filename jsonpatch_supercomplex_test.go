@@ -492,7 +492,7 @@ var superComplexA = `
 
 var superComplexTestCollections = Collections{
 	EntitySets: EntitySets{},
-	Arrays:     []string{"$.annotations.annotation", "$.attributes.attribute-key"},
+	Arrays:     []Path{"$.annotations.annotation", "$.attributes.attribute-key"},
 }
 
 func TestSuperComplexSame(t *testing.T) {
