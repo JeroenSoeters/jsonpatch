@@ -1,7 +1,6 @@
 package jsonpatch
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -74,20 +73,21 @@ func TestComplexOneAddToArray(t *testing.T) {
 	assert.Equal(t, expected, change.Value, "they should be equal")
 }
 
+// We never remove keys from objects
 func TestComplexVsEmpty(t *testing.T) {
 	patch, e := CreatePatch([]byte(complexBase), []byte(empty), complex_test_collections, PatchStrategyExactMatch)
 	assert.NoError(t, e)
-	assert.Equal(t, 3, len(patch), "they should be equal")
-	sort.Sort(ByPath(patch))
-	change := patch[0]
-	assert.Equal(t, "remove", change.Operation, "they should be equal")
-	assert.Equal(t, "/a", change.Path, "they should be equal")
-
-	change = patch[1]
-	assert.Equal(t, "remove", change.Operation, "they should be equal")
-	assert.Equal(t, "/b", change.Path, "they should be equal")
-
-	change = patch[2]
-	assert.Equal(t, "remove", change.Operation, "they should be equal")
-	assert.Equal(t, "/e", change.Path, "they should be equal")
+	assert.Equal(t, 0, len(patch), "they should be equal")
+	// sort.Sort(ByPath(patch))
+	// change := patch[0]
+	// assert.Equal(t, "remove", change.Operation, "they should be equal")
+	// assert.Equal(t, "/a", change.Path, "they should be equal")
+	//
+	// change = patch[1]
+	// assert.Equal(t, "remove", change.Operation, "they should be equal")
+	// assert.Equal(t, "/b", change.Path, "they should be equal")
+	//
+	// change = patch[2]
+	// assert.Equal(t, "remove", change.Operation, "they should be equal")
+	// assert.Equal(t, "/e", change.Path, "they should be equal")
 }
