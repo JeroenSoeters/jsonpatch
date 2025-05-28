@@ -21,7 +21,7 @@ var (
 	}
 )
 
-func TestArrayAddMultipleEmptyObjects(t *testing.T) {
+func TestArrayAddMultipleEmptyObjectsExactMatch(t *testing.T) {
 	patch, e := CreatePatch([]byte(arrayBase), []byte(arrayUpdated), arrayTestCollections, PatchStrategyExactMatch)
 	assert.NoError(t, e)
 	t.Log("Patch:", patch)
@@ -34,7 +34,7 @@ func TestArrayAddMultipleEmptyObjects(t *testing.T) {
 	assert.Equal(t, map[string]any{}, change.Value, "they should be equal")
 }
 
-func TestArrayRemoveMultipleEmptyObjects(t *testing.T) {
+func TestArrayRemoveMultipleEmptyObjectsExactMatch(t *testing.T) {
 	patch, e := CreatePatch([]byte(arrayUpdated), []byte(arrayBase), arrayTestCollections, PatchStrategyExactMatch)
 	assert.NoError(t, e)
 	t.Log("Patch:", patch)

@@ -287,9 +287,9 @@ func diff(a, b map[string]any, path string, patch []JsonPatchOperation, strategy
 		for key := range a {
 			_, found := b[key]
 			if !found {
-				p := makePath(path, key)
+				_ = makePath(path, key)
 
-				patch = append(patch, NewPatch("remove", p, nil))
+				//				patch = append(patch, NewPatch("remove", p, nil))
 			}
 		}
 	}
@@ -375,21 +375,25 @@ func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Co
 			return retval
 		}
 		// TODO: removing is not tested yest!
+		removals := 0
 		if strategy == PatchStrategyExactMatch {
 			// Find elements that need to be removed
+			elementsBeforeRemove := len(retval)
 			processIdentitySet(av, bv, p, func(i int, value any) {
 				retval = append(retval, NewPatch("remove", makePath(p, i), nil))
 			}, func(ops []JsonPatchOperation) {
 				retval = append(retval, ops...)
 			}, strategy, collections)
+			removals = len(retval) - elementsBeforeRemove
 			reversed := make([]JsonPatchOperation, len(retval))
 			for i := range retval {
 				reversed[len(retval)-1-i] = retval[i]
 			}
 			retval = reversed
 		}
+		offset := len(av) - removals
 		processIdentitySet(bv, av, p, func(i int, value any) {
-			retval = append(retval, NewPatch("add", makePath(p, i), value))
+			retval = append(retval, NewPatch("add", makePath(p, i+offset), value))
 		}, func(ops []JsonPatchOperation) {
 			retval = append(retval, ops...)
 		}, strategy, collections)
@@ -399,17 +403,20 @@ func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Co
 		}
 		// TODO: removing is not tested yest!
 		// also we need to check for PatchStrategyEnsureAbsent
+		removals := 0
 		if strategy == PatchStrategyExactMatch {
 			// Find elements that need to be removed
+			elementsBeforeRemove := len(retval)
 			processSet(av, bv, func(i int, value any) { retval = append(retval, NewPatch("remove", makePath(p, i), nil)) })
+			removals = len(retval) - elementsBeforeRemove
 			reversed := make([]JsonPatchOperation, len(retval))
 			for i := range retval {
 				reversed[len(retval)-1-i] = retval[i]
 			}
 			retval = reversed
 		}
-
-		processSet(bv, av, func(i int, value any) { retval = append(retval, NewPatch("add", makePath(p, i), value)) })
+		offset := len(av) - removals
+		processSet(bv, av, func(i int, value any) { retval = append(retval, NewPatch("add", makePath(p, i+offset), value)) })
 	}
 
 	return retval
@@ -418,7 +425,6 @@ func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Co
 func processSet(av, bv []any, applyOp func(i int, value any)) {
 	foundIndexes := make(map[int]struct{}, len(av))
 	lookup := make(map[string]int)
-	offset := len(bv)
 
 	for i, v := range bv {
 		jsonBytes, err := json.Marshal(v)
@@ -433,7 +439,7 @@ func processSet(av, bv []any, applyOp func(i int, value any)) {
 	for i, v := range av {
 		jsonBytes, err := json.Marshal(v)
 		if err != nil {
-			applyOp(i+offset, v) // If we can't marshal, treat it as not found
+			applyOp(i, v) // If we can't marshal, treat it as not found
 			continue
 		}
 
@@ -447,7 +453,7 @@ func processSet(av, bv []any, applyOp func(i int, value any)) {
 	// Apply op for all elements in av that weren't found
 	for i, v := range av {
 		if _, ok := foundIndexes[i]; !ok {
-			applyOp(i+offset, v)
+			applyOp(i, v)
 		}
 	}
 }
@@ -455,7 +461,6 @@ func processSet(av, bv []any, applyOp func(i int, value any)) {
 func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy PatchStrategy, collections Collections) {
 	foundIndexes := make(map[int]struct{}, len(av))
 	lookup := make(map[string]int)
-	offset := len(bv)
 
 	for i, v := range bv {
 		key, ok := collections.EntitySets.Get(Path(toJsonPath(path)))
@@ -477,7 +482,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 		}
 		jsonBytes, err := json.Marshal(v.(map[string]any)[string(key)])
 		if err != nil {
-			applyOp(i+offset, v) // If we can't marshal, treat it as not found
+			applyOp(i, v) // If we can't marshal, treat it as not found
 			continue
 		}
 
@@ -494,7 +499,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 
 	for i, v := range av {
 		if _, ok := foundIndexes[i]; !ok {
-			applyOp(i+offset, v)
+			applyOp(i, v)
 		}
 	}
 }
