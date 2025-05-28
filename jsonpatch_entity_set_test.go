@@ -70,7 +70,7 @@ func TestCreatePatch_AddItemToEntitySet_InExactMatchMode_GeneratesAddOperation(t
 	assert.Equal(t, expected, change.Value, "they should be equal")
 }
 
-func TestCreatePatch_EntitySet_ModifyItem_GeneratesReplaceOperation(t *testing.T) {
+func TestCreatePatch_ModifyItemInEntitySet_InEnsureExistsMode_GeneratesReplaceOperation(t *testing.T) {
 	patch, err := CreatePatch([]byte(simpleObjEntitySet), []byte(simpleObjModifyEntitySetItem), entitySetTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(patch), "they should be equal")
@@ -81,13 +81,36 @@ func TestCreatePatch_EntitySet_ModifyItem_GeneratesReplaceOperation(t *testing.T
 	assert.Equal(t, expected, change.Value, "they should be equal")
 }
 
-func TestCreatePatch_EntitySet_AddDuplicateItem_GeneratesNoOperations(t *testing.T) {
+func TestCreatePatch_ModifyItemInEntitySet_InExactMatchMode_GeneratesARemoveAndAReplaceOperation(t *testing.T) {
+	patch, err := CreatePatch([]byte(simpleObjEntitySet), []byte(simpleObjModifyEntitySetItem), entitySetTestCollections, PatchStrategyExactMatch)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(patch), "they should be equal")
+	change := patch[0]
+	assert.Equal(t, "remove", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/0", change.Path, "they should be equal")
+	change = patch[1]
+	assert.Equal(t, "replace", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v", change.Path, "they should be equal")
+	var expected float64 = 3
+	assert.Equal(t, expected, change.Value, "they should be equal")
+}
+
+func TestCreatePatch_AddDuplicateItemToEntitySet_InEnsureExistsMode_GeneratesNoOperations(t *testing.T) {
 	patch, err := CreatePatch([]byte(simpleObjEntitySet), []byte(simpleObjAddDuplicateEntitySetItem), entitySetTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(patch), "they should be equal")
 }
 
-func TestCreatePatch_ComplexNestedEntitySet_ModifyItem_GeneratesReplaceOperation(t *testing.T) {
+func TestCreatePatch_AddDuplicateItemToEntitySet_InExactMatchMode_GeneratesARemoveOperation(t *testing.T) {
+	patch, err := CreatePatch([]byte(simpleObjEntitySet), []byte(simpleObjAddDuplicateEntitySetItem), entitySetTestCollections, PatchStrategyExactMatch)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(patch), "they should be equal")
+	change := patch[0]
+	assert.Equal(t, "remove", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/0", change.Path, "they should be equal")
+}
+
+func TestCreatePatch_ModifyItemInComplexNestedEntitySet_InEnsureExistsMode_GeneratesReplaceOperation(t *testing.T) {
 	patch, err := CreatePatch([]byte(complexNextedEntitySet), []byte(complexNextedEntitySetModifyItem), entitySetTestCollections, PatchStrategyEnsureExists)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(patch), "they should be equal")
@@ -103,5 +126,32 @@ func TestCreatePatch_ComplexNestedEntitySet_ModifyItem_GeneratesReplaceOperation
 	assert.Equal(t, "add", change.Operation, "they should be equal")
 	assert.Equal(t, "add", change.Operation, "they should be equal")
 	assert.Equal(t, "/t/1/v/0/d/3", change.Path, "they should be equal")
+	assert.Equal(t, float64(8), change.Value, "they should be equal")
+}
+
+func TestCreatePatch_ModifyItemInComplexNestedEntitySet_InExactMatchMode_GeneratesReplaceOperation(t *testing.T) {
+	patch, err := CreatePatch([]byte(complexNextedEntitySet), []byte(complexNextedEntitySetModifyItem), entitySetTestCollections, PatchStrategyExactMatch)
+	assert.NoError(t, err)
+	assert.Equal(t, 6, len(patch), "they should be equal")
+	change := patch[0]
+	assert.Equal(t, "remove", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/0", change.Path, "they should be equal")
+	change = patch[1]
+	assert.Equal(t, "replace", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/c", change.Path, "they should be equal")
+	assert.Equal(t, "zz", change.Value, "they should be equal")
+	change = patch[2]
+	assert.Equal(t, "remove", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/d/1", change.Path, "they should be equal")
+	change = patch[3]
+	assert.Equal(t, "remove", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/d/0", change.Path, "they should be equal")
+	change = patch[4]
+	assert.Equal(t, "add", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/d/0", change.Path, "they should be equal")
+	assert.Equal(t, float64(7), change.Value, "they should be equal")
+	change = patch[5]
+	assert.Equal(t, "add", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1/v/0/d/1", change.Path, "they should be equal")
 	assert.Equal(t, float64(8), change.Value, "they should be equal")
 }

@@ -381,8 +381,7 @@ func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Co
 			elementsBeforeRemove := len(retval)
 			processIdentitySet(av, bv, p, func(i int, value any) {
 				retval = append(retval, NewPatch("remove", makePath(p, i), nil))
-			}, func(ops []JsonPatchOperation) {
-				retval = append(retval, ops...)
+			}, func(ops []JsonPatchOperation) { // no-op
 			}, strategy, collections)
 			removals = len(retval) - elementsBeforeRemove
 			reversed := make([]JsonPatchOperation, len(retval))
