@@ -8,17 +8,21 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
-var errBadJSONDoc = fmt.Errorf("Invalid JSON Document")
+var errBadJsonDoc = fmt.Errorf("Invalid Json Document")
 
 type Path string
 type Key string
 type EntitySets map[Path]Key
 
 type Collections struct {
-	EntitySets EntitySets
-	Arrays     []Path
+	EntitySets    EntitySets
+	Arrays        []Path
+	IgnoredFields []Path
 }
 
 func (c *Collections) isArray(path string) bool {
@@ -90,7 +94,7 @@ func (j *JsonPatchOperation) Json() string {
 	return string(b)
 }
 
-func (j *JsonPatchOperation) MarshalJSON() ([]byte, error) {
+func (j *JsonPatchOperation) MarshalJson() ([]byte, error) {
 	var b bytes.Buffer
 	b.WriteString("{")
 	b.WriteString(fmt.Sprintf(`"op":"%s"`, j.Operation))
@@ -126,19 +130,27 @@ func NewPatch(operation, path string, value any) JsonPatchOperation {
 //
 // An e rror will be returned if any of the two documents are invalid.
 func CreatePatch(a, b []byte, collections Collections, strategy PatchStrategy) ([]JsonPatchOperation, error) {
-	var aI any
-	var bI any
+	var aUnmarshalled any
+	var bUnmarshalled any
 
-	err := json.Unmarshal(a, &aI)
+	err := json.Unmarshal(a, &aUnmarshalled)
 	if err != nil {
-		return nil, errBadJSONDoc
+		return nil, errBadJsonDoc
 	}
-	err = json.Unmarshal(b, &bI)
+	err = json.Unmarshal(b, &bUnmarshalled)
 	if err != nil {
-		return nil, errBadJSONDoc
+		return nil, errBadJsonDoc
+	}
+	aWithoutIgnoredFields, err := removeIgnoredFields(aUnmarshalled, collections.IgnoredFields)
+	if err != nil {
+		return nil, fmt.Errorf("error removing ignored fields from original document: %w", err)
+	}
+	bWithoutIgnoredFields, err := removeIgnoredFields(bUnmarshalled, collections.IgnoredFields)
+	if err != nil {
+		return nil, fmt.Errorf("error removing ignored fields from modified document: %w", err)
 	}
 
-	return handleValues(aI, bI, "", []JsonPatchOperation{}, strategy, collections)
+	return handleValues(aWithoutIgnoredFields, bWithoutIgnoredFields, "", []JsonPatchOperation{}, strategy, collections)
 }
 
 // Returns true if the values matches (must be json types)
@@ -192,7 +204,7 @@ func matchesValue(av, bv any, ignoreArrayOrder bool) bool {
 
 			// Count elements in first array
 			for _, v := range at {
-				// Convert element to JSON string for comparison
+				// Convert element to Json string for comparison
 				jsonBytes, err := json.Marshal(v)
 				if err != nil {
 					return false
@@ -562,4 +574,71 @@ func processArray(av, bv []any, applyOp func(i int, value any), strategy PatchSt
 	case PatchStrategyEnsureAbsent:
 		return
 	}
+}
+
+func removeIgnoredFields(data any, ignoredFields []Path) (any, error) {
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonStr := string(jsonBytes)
+
+	for _, path := range ignoredFields {
+		jsonStr, err = removeJSONPath(jsonStr, string(path))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var result any
+	err = json.Unmarshal([]byte(jsonStr), &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func removeJSONPath(jsonStr, jsonPath string) (string, error) {
+	if strings.Contains(jsonPath, "[*]") {
+		return removeFromArrayElements(jsonStr, jsonPath)
+	}
+
+	path := strings.TrimPrefix(jsonPath, "$.")
+	path = strings.TrimPrefix(path, "$")
+
+	result, err := sjson.Delete(jsonStr, path)
+	if err != nil {
+		return "", err
+	}
+
+	return result, nil
+}
+
+func removeFromArrayElements(jsonStr, jsonPath string) (string, error) {
+	parts := strings.Split(jsonPath, "[*].")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid wildcard path format")
+	}
+
+	arrayPath := strings.TrimPrefix(parts[0], "$.")
+	arrayPath = strings.TrimPrefix(arrayPath, "$")
+	propertyToRemove := parts[1]
+
+	arrayResult := gjson.Get(jsonStr, arrayPath)
+	if !arrayResult.Exists() || !arrayResult.IsArray() {
+		return jsonStr, nil
+	}
+
+	result := jsonStr
+	var err error
+
+	arrayResult.ForEach(func(key, value gjson.Result) bool {
+		elementPath := fmt.Sprintf("%s.%d.%s", arrayPath, key.Int(), propertyToRemove)
+		result, err = sjson.Delete(result, elementPath)
+		return err == nil
+	})
+
+	return result, err
 }

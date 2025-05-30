@@ -15,6 +15,7 @@ var simpleObjAddDuplicateItemToPrimitiveSet = `{"b":[2]}`
 var simpleObjSingletonObjectSet = `{"a":100, "b":[{"c":1}]}`
 var simpleObjAddObjectSetItem = `{"b":[{"c":2}]}`
 var simpleObjAddDuplicateObjectSetItem = `{"b":[{"c":1}]}`
+var simpleObjAddObjectSetItemWithIgnoredValue = `{"b":[{"c":1, "d":"ignored"}]}`
 
 var nestedObj = `{"a":100, "b":{"c":200}}`
 var nestedObjModifyProp = `{"b":{"c":250}}`
@@ -23,8 +24,9 @@ var nestedObjPrimitiveSet = `{"a":100, "b":{"c":[200]}}`
 var nestedObjAddPrimitiveSetItem = `{"b":{"c":[250]}}`
 
 var setTestCollections = Collections{
-	EntitySets: EntitySets{},
-	Arrays:     []Path{}, // No arrays in this test, only sets
+	EntitySets:    EntitySets{},
+	Arrays:        []Path{},           // No arrays in this test, only sets
+	IgnoredFields: []Path{"$.b[*].d"}, // Ignored property for object sets
 }
 
 func TestCreatePatch_AddItemToEmptyPrimitiveSetInEnsureExistsMode_GeneratesAddOperation(t *testing.T) {
@@ -203,6 +205,12 @@ func TestCreatePatch_AddItemToObjectSetWithOneItem_InExactMatchMode_GeneratesAdd
 	assert.Equal(t, "/b/0", change.Path, "they should be equal")
 	var expected = map[string]any{"c": float64(2)}
 	assert.Equal(t, expected, change.Value, "they should be equal")
+}
+
+func TestCreatePatch_AddItemToObjectSetWithOneItemAndIgnoredValue_InEnsureExistsMode_GeneratesNoOperations(t *testing.T) {
+	patch, err := CreatePatch([]byte(simpleObjSingletonObjectSet), []byte(simpleObjAddObjectSetItemWithIgnoredValue), setTestCollections, PatchStrategyEnsureExists)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(patch), "they should be equal")
 }
 
 func TestCreatePatch_AddDuplicateItemToObjectSetWithOneItem_InEnsureExistsMode_GeneratesNoOperations(t *testing.T) {
