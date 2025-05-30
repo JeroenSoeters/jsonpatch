@@ -508,9 +508,11 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 		}
 	}
 
+	offset := 0
 	for i, v := range av {
 		if _, ok := foundIndexes[i]; !ok {
-			applyOp(i, v)
+			applyOp(offset, v)
+			offset++
 		}
 	}
 }

@@ -10,6 +10,7 @@ var simpleObjEntitySet = `{"a":100, "t":[{"k":1, "v":1},{"k":2, "v":2}]}`
 var simpleObjAddEntitySetItem = `{"t":[{"k":3, "v":3}]}`
 var simpleObjModifyEntitySetItem = `{"t":[{"k":2, "v":3}]}`
 var simpleObjAddDuplicateEntitySetItem = `{"t":[{"k":2, "v":2}]}`
+var simpleObjAddMultipleDuplicateAndFailedItems = `{"t":[{"k":1, "v":1},{"k":2, "v":2},{"k":3, "v":3},{"k":4, "v":4}]}`
 var complexNextedEntitySet = `{
     "a":100,
     "t":[
@@ -154,4 +155,20 @@ func TestCreatePatch_ModifyItemInComplexNestedEntitySet_InExactMatchMode_Generat
 	assert.Equal(t, "add", change.Operation, "they should be equal")
 	assert.Equal(t, "/t/1/v/0/d/1", change.Path, "they should be equal")
 	assert.Equal(t, float64(8), change.Value, "they should be equal")
+}
+
+func TestCreatePatch_AddMultipleDuplicateAndFailedItemsToEntitySet_InEnsureExistsMode_GeneratesNoOperations(t *testing.T) {
+	patch, err := CreatePatch([]byte(simpleObjEntitySet), []byte(simpleObjAddMultipleDuplicateAndFailedItems), entitySetTestCollections, PatchStrategyEnsureExists)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(patch), "they should be equal")
+	change := patch[0]
+	assert.Equal(t, "add", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/2", change.Path, "they should be equal")
+	var expected = map[string]any{"k": float64(3), "v": float64(3)}
+	assert.Equal(t, expected, change.Value, "they should be equal")
+	change = patch[1]
+	assert.Equal(t, "add", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/3", change.Path, "they should be equal")
+	var expected2 = map[string]any{"k": float64(4), "v": float64(4)}
+	assert.Equal(t, expected2, change.Value, "they should be equal")
 }
