@@ -391,7 +391,7 @@ func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Co
 		if strategy == PatchStrategyExactMatch {
 			// Find elements that need to be removed
 			elementsBeforeRemove := len(retval)
-			processIdentitySet(av, bv, p, func(i int, value any) {
+			processIdentitySet(av, bv, p, func(i, o int, value any) {
 				retval = append(retval, NewPatch("remove", makePath(p, i), nil))
 			}, func(ops []JsonPatchOperation) { // no-op
 			}, strategy, collections)
@@ -403,8 +403,8 @@ func compareArray(av, bv []any, p string, strategy PatchStrategy, collections Co
 			retval = reversed
 		}
 		offset := len(av) - removals
-		processIdentitySet(bv, av, p, func(i int, value any) {
-			retval = append(retval, NewPatch("add", makePath(p, i+offset), value))
+		processIdentitySet(bv, av, p, func(i, o int, value any) {
+			retval = append(retval, NewPatch("add", makePath(p, o+offset), value))
 		}, func(ops []JsonPatchOperation) {
 			retval = append(retval, ops...)
 		}, strategy, collections)
@@ -469,7 +469,7 @@ func processSet(av, bv []any, applyOp func(i int, value any)) {
 	}
 }
 
-func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any), replaceOps func(ops []JsonPatchOperation), strategy PatchStrategy, collections Collections) {
+func processIdentitySet(av, bv []any, path string, applyOp func(i, o int, value any), replaceOps func(ops []JsonPatchOperation), strategy PatchStrategy, collections Collections) {
 	foundIndexes := make(map[int]struct{}, len(av))
 	lookup := make(map[string]int)
 
@@ -493,7 +493,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 		}
 		jsonBytes, err := json.Marshal(v.(map[string]any)[string(key)])
 		if err != nil {
-			applyOp(i, v) // If we can't marshal, treat it as not found
+			applyOp(i, 0, v) // If we can't marshal, treat it as not found
 			continue
 		}
 
@@ -511,7 +511,7 @@ func processIdentitySet(av, bv []any, path string, applyOp func(i int, value any
 	offset := 0
 	for i, v := range av {
 		if _, ok := foundIndexes[i]; !ok {
-			applyOp(offset, v)
+			applyOp(i, offset, v)
 			offset++
 		}
 	}

@@ -11,6 +11,7 @@ var simpleObjAddEntitySetItem = `{"t":[{"k":3, "v":3}]}`
 var simpleObjModifyEntitySetItem = `{"t":[{"k":2, "v":3}]}`
 var simpleObjAddDuplicateEntitySetItem = `{"t":[{"k":2, "v":2}]}`
 var simpleObjAddMultipleDuplicateAndFailedItems = `{"t":[{"k":1, "v":1},{"k":2, "v":2},{"k":3, "v":3},{"k":4, "v":4}]}`
+var simpleObjEntitySetRemoveItem = `{"a":100, "t":[{"k":1, "v":1}]}`
 var complexNextedEntitySet = `{
     "a":100,
     "t":[
@@ -80,6 +81,15 @@ func TestCreatePatch_ModifyItemInEntitySet_InEnsureExistsMode_GeneratesReplaceOp
 	assert.Equal(t, "/t/1/v", change.Path, "they should be equal")
 	var expected float64 = 3
 	assert.Equal(t, expected, change.Value, "they should be equal")
+}
+
+func TestCreatePatch_RemoveItemFromEntitySet_InExactMatchExistsMode_GeneratesRemoveOperation(t *testing.T) {
+	patch, err := CreatePatch([]byte(simpleObjEntitySet), []byte(simpleObjEntitySetRemoveItem), entitySetTestCollections, PatchStrategyExactMatch)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(patch), "they should be equal")
+	change := patch[0]
+	assert.Equal(t, "remove", change.Operation, "they should be equal")
+	assert.Equal(t, "/t/1", change.Path, "they should be equal")
 }
 
 func TestCreatePatch_ModifyItemInEntitySet_InExactMatchMode_GeneratesARemoveAndAReplaceOperation(t *testing.T) {
