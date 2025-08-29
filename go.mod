@@ -1,4 +1,4 @@
-module github.com/JeroenSoeters/jsonpatch
+module github.com/platform-engineering-labs/jsonpatch
 
 go 1.23.4
 
